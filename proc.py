@@ -3,6 +3,14 @@ import os, psutil, unicodedata, datetime
 from flask import Flask, jsonify, abort, make_response, request
 from flask.ext.httpauth import HTTPBasicAuth
 from subprocess import call, Popen
+from OpenSSL import SSL
+
+SSL_OPT = False # Opcion activar HTTPS
+
+if SSL_OPT:
+    context = SSL.Context(SSL.SSLv23_METHOD)
+    context.use_privatekey_file('server.key') 
+    context.use_certificate_file('server.crt')
 
 app = Flask(__name__)
 
@@ -69,7 +77,7 @@ def start_proc():
         pid = Popen(cmd).pid
     except OSError:
         abort(400)
-    return jsonify({'proc': pid}), 201
+    return jsonify({'pid': pid}), 201
 
 
 ### Cambiar la prioridad a un proceso basado en su PID ###
@@ -88,7 +96,8 @@ def renice_proc(pid):
         abort(400)
     if 'nice' in request.json and type(request.json['nice']) is not unicode:
         abort(400)
-    # TODO: validar rango de valores nice
+    if  int(request.json['nice']) < -20 or int(request.json['nice']) > 19: # Rango de valores nice
+        abort(400)  
     p = psutil.Process(pid)
     nice = request.json.get('nice', proc[0]['nice'])
     try:
@@ -132,6 +141,6 @@ def forbidden(error):
 def bad_request(error):
     return make_response(jsonify({'Error': 'Peticion incorrecta'}), 400)
 
-
 if __name__ == '__main__':
-    app.run(debug=True)
+    if SSL_OPT: app.run(ssl_context=context)
+    app.run(host='0.0.0.0', debug=True)

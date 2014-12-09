@@ -142,5 +142,5 @@ def bad_request(error):
     return make_response(jsonify({'Error': 'Peticion incorrecta'}), 400)
 
 if __name__ == '__main__':
-    if SSL_OPT: app.run(ssl_context=context)
-    app.run(host='0.0.0.0', debug=True)
+    if SSL_OPT: app.run(host='0.0.0.0', port=5001, debug=True, ssl_context=context)
+    else: app.run(host='0.0.0.0', debug=True)

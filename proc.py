@@ -5,9 +5,10 @@ from flask.ext.httpauth import HTTPBasicAuth
 from subprocess import call, Popen
 from OpenSSL import SSL
 
-SSL_OPT = False # Opcion activar HTTPS
+OPT_SSL = False   # Activar HTTPS
+OPT_ACL = False   # Activar ACL
 
-if SSL_OPT:
+if OPT_SSL:
     context = SSL.Context(SSL.SSLv23_METHOD)
     context.use_privatekey_file('server.key') 
     context.use_certificate_file('server.crt')
@@ -71,12 +72,15 @@ def get_pid(pid):
 def start_proc():
     if not request.json or not 'cmd' in request.json:
         abort(400)
-    cmd = request.json.get('cmd', "")
+    if OPT_ACL: # Sudo cmd como usuario identificado
+        cmd = 'sudo -u '+auth.username()+' '+request.json.get('cmd', "") 
+    else: cmd = request.json.get('cmd', "")
     cmd = cmd.split()
+    print cmd
     try:
         pid = Popen(cmd).pid
     except OSError:
-        abort(400)
+        abort(500)
     return jsonify({'pid': pid}), 201
 
 
@@ -97,7 +101,10 @@ def renice_proc(pid):
     if 'nice' in request.json and type(request.json['nice']) is not unicode:
         abort(400)
     if  int(request.json['nice']) < -20 or int(request.json['nice']) > 19: # Rango de valores nice
-        abort(400)  
+        abort(400)
+    if OPT_ACL:
+        if (auth.username() != 'root' and auth.username() != proc[0]['user']):
+            abort(403)
     p = psutil.Process(pid)
     nice = request.json.get('nice', proc[0]['nice'])
     try:
@@ -119,6 +126,9 @@ def kill_proc(pid):
         abort(404)    
     if pid == os.getpid(): # Comparo con mi PID para no inmolarme
         abort(403)
+    if OPT_ACL: # Si no es root y el comando no pertenece al usuario
+        if (auth.username() != 'root' and auth.username() != proc[0]['user']):
+            abort(403)
     p = psutil.Process(pid)    
     try:
         p.kill()
@@ -142,5 +152,6 @@ def bad_request(error):
     return make_response(jsonify({'Error': 'Peticion incorrecta'}), 400)
 
 if __name__ == '__main__':
-    if SSL_OPT: app.run(host='0.0.0.0', port=5001, debug=True, ssl_context=context)
+    if OPT_ACL and not OPT_SSL: exit('Debe activar HTTPS para utilizar ACL')
+    if OPT_SSL: app.run(host='0.0.0.0', port=5001, debug=True, ssl_context=context)
     else: app.run(host='0.0.0.0', debug=True)

@@ -5,7 +5,8 @@ Implementación de una API RESTful para la gestión de procesos en Python para l
 
 ### Opciones
 
-`SSL_OPT = <boleean>` Utilizar HTTPS (puerto: 5001) 
+`OPT_SSL = <boolean>` Utilizar HTTPS (puerto: 5001) 
+`OPT_ACL = <boolean>` Activar control por lista de usuarios
 
 ### Librerías
 

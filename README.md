@@ -13,4 +13,3 @@ Implementación de una API RESTful para la gestión de procesos en Python para l
 * Flask: https://flask.pocoo.org
 * psutil: https://code.google.com/p/psutil/
 * pyOpenSSL: https://pypi.python.org/pypi/pyOpenSSL
-

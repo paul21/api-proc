@@ -107,7 +107,7 @@ def renice_proc(pid):
         abort(400)
     if  int(request.json['nice']) < -20 or int(request.json['nice']) > 19: # Rango de valores nice
         abort(400)
-    if OPT_ACL: # Si no es root o el comando no pertenece al usuario
+    if OPT_ACL: # Si no es root o el proceso no pertenece al usuario
         if (auth.username() != 'root' and auth.username() != proc[0]['user']):
             abort(403)
     try:
@@ -130,7 +130,7 @@ def kill_proc(pid):
         abort(404)    
     if pid == os.getpid(): # Comparo con mi PID para no inmolarme
         abort(403)
-    if OPT_ACL: # Si no es root o el comando no pertenece al usuario
+    if OPT_ACL: # Si no es root o el proceso no pertenece al usuario
         if (auth.username() != 'root' and auth.username() != proc[0]['user']):
             abort(403)
     p = psutil.Process(pid)    
@@ -159,4 +159,3 @@ if __name__ == '__main__':
     if OPT_ACL and not OPT_SSL: exit('Debe activar HTTPS para utilizar ACL')
     if OPT_SSL: app.run(host='0.0.0.0', port=5001, debug=True, ssl_context=context)
     else: app.run(host='0.0.0.0', port=5000, debug=True)
-

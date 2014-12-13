@@ -11,5 +11,6 @@ Implementación de una API RESTful para la gestión de procesos en Python para l
 ### Librerías
 
 * Flask: https://flask.pocoo.org
+* Flask-HTTPAuth https://github.com/miguelgrinberg/Flask-HTTPAuth
 * psutil: https://code.google.com/p/psutil/
 * pyOpenSSL: https://pypi.python.org/pypi/pyOpenSSL

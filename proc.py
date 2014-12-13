@@ -1,12 +1,13 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 import os, psutil, unicodedata, datetime
 from flask import Flask, jsonify, abort, make_response, request
 from flask.ext.httpauth import HTTPBasicAuth
 from subprocess import call, Popen
 from OpenSSL import SSL
 
-OPT_SSL = False   # Activar HTTPS
-OPT_ACL = False   # Activar ACL
+OPT_SSL = False  # Activar HTTPS
+OPT_ACL = False  # Activar ACL
 
 if OPT_SSL:
     context = SSL.Context(SSL.SSLv23_METHOD)
@@ -30,7 +31,7 @@ def unauthorized():
 procs = []
 
 def load_procs():
-    procs[:] = [] # Vacio la lista de procesos
+    procs[:] = [] # Vacío la lista de procesos
     for proc in psutil.process_iter():  
         procs.append({
                 'pid': proc.pid,
@@ -44,7 +45,7 @@ def load_procs():
                 'start': datetime.datetime.fromtimestamp(proc.create_time).strftime("%Y-%m-%d %H:%M:%S"),
                 'tty': proc.terminal
             })
-        
+    
 
 ### Obtener todos los procesos ###
 
@@ -72,13 +73,18 @@ def get_pid(pid):
 def start_proc():
     if not request.json or not 'cmd' in request.json:
         abort(400)
-    if OPT_ACL: # Sudo cmd como usuario identificado
-        cmd = 'sudo -u '+auth.username()+' '+request.json.get('cmd', "") 
-    else: cmd = request.json.get('cmd', "")
+    if OPT_ACL: # sudo como el usuario identificado
+        cmd = 'sudo -u '+auth.username()+' '+request.json.get('cmd') 
+    else: cmd = request.json.get('cmd')
     cmd = cmd.split()
-    print cmd
     try:
         pid = Popen(cmd).pid
+        if OPT_ACL: # Debe retornar el PID del proceso hijo de sudo
+            p = psutil.Process(pid)
+            while(p.status != 'sleeping'): # Espero a que sudo forkee y se duerma
+                continue
+            child = p.get_children()
+            pid = child[0].pid
     except OSError:
         abort(500)
     return jsonify({'pid': pid}), 201
@@ -87,11 +93,10 @@ def start_proc():
 ### Cambiar la prioridad a un proceso basado en su PID ###
 
 @app.route('/v1.0/procs/<int:pid>', methods=['PUT'])
-@auth.login_required # Requiere autenticacion
+@auth.login_required # Requiere autenticación
 def renice_proc(pid):  
     load_procs()
     proc = filter(lambda p: p['pid'] == pid, procs)
-    ## Validaciones ##
     if len(proc) == 0:
         abort(404)
     if not request.json:
@@ -102,14 +107,13 @@ def renice_proc(pid):
         abort(400)
     if  int(request.json['nice']) < -20 or int(request.json['nice']) > 19: # Rango de valores nice
         abort(400)
-    if OPT_ACL:
+    if OPT_ACL: # Si no es root o el comando no pertenece al usuario
         if (auth.username() != 'root' and auth.username() != proc[0]['user']):
             abort(403)
-    p = psutil.Process(pid)
-    nice = request.json.get('nice', proc[0]['nice'])
     try:
-        p.set_nice(int(nice))
-        proc[0]['nice'] = nice
+        p = psutil.Process(pid)
+        p.set_nice(int(request.json.get('nice')))
+        proc[0]['nice'] = p.get_nice()
     except psutil.AccessDenied:
         abort(403) # Permisos insuficientes
     return jsonify({'proc': proc[0]})
@@ -118,7 +122,7 @@ def renice_proc(pid):
 ### Matar un proceso basado en su PID ###
 
 @app.route('/v1.0/procs/<int:pid>', methods=['DELETE'])
-@auth.login_required # Requiere autenticacion
+@auth.login_required # Requiere autenticación
 def kill_proc(pid):
     load_procs()
     proc = filter(lambda p: p['pid'] == pid, procs)
@@ -126,7 +130,7 @@ def kill_proc(pid):
         abort(404)    
     if pid == os.getpid(): # Comparo con mi PID para no inmolarme
         abort(403)
-    if OPT_ACL: # Si no es root y el comando no pertenece al usuario
+    if OPT_ACL: # Si no es root o el comando no pertenece al usuario
         if (auth.username() != 'root' and auth.username() != proc[0]['user']):
             abort(403)
     p = psutil.Process(pid)    
@@ -137,7 +141,7 @@ def kill_proc(pid):
     return jsonify({'result': True})
 
 
-### Manejadores de codigos de retorno HTTP ###
+### Manejadores de códigos de retorno HTTP ###
 
 @app.errorhandler(404)
 def not_found(error):
@@ -154,4 +158,5 @@ def bad_request(error):
 if __name__ == '__main__':
     if OPT_ACL and not OPT_SSL: exit('Debe activar HTTPS para utilizar ACL')
     if OPT_SSL: app.run(host='0.0.0.0', port=5001, debug=True, ssl_context=context)
-    else: app.run(host='0.0.0.0', debug=True)
+    else: app.run(host='0.0.0.0', port=5000, debug=True)
+

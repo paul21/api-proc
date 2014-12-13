@@ -135,9 +135,12 @@ def kill_proc(pid):
             abort(403)
     p = psutil.Process(pid)    
     try:
-        p.kill()
+        p.terminate() # SIGTERM
+        p.wait(timeout=0.1)
     except psutil.AccessDenied:
         abort(403) # Permisos insuficientes
+    except psutil.TimeoutExpired:
+        p.kill() # SIGKILL
     return jsonify({'result': True})
 
 

@@ -7,7 +7,7 @@ from subprocess import call, Popen
 from OpenSSL import SSL
 
 OPT_SSL = False  # Activar HTTPS
-OPT_ACL = False  # Activar ACL
+OPT_ACL = False # Activar ACL
 
 if OPT_SSL:
     context = SSL.Context(SSL.SSLv23_METHOD)
@@ -69,7 +69,7 @@ def get_pid(pid):
 ### Lanzar un proceso ###
 
 @app.route('/v1.0/procs', methods=['POST'])
-@auth.login_required # Requiere autenticacion
+@auth.login_required # Requiere autenticación
 def start_proc():
     if not request.json or not 'cmd' in request.json:
         abort(400)
@@ -84,7 +84,8 @@ def start_proc():
             while(p.status != 'sleeping'): # Espero a que sudo forkee y se duerma
                 continue
             child = p.get_children()
-            pid = child[0].pid
+            if len(child) > 0:
+                pid = child[0].pid
     except OSError:
         abort(500)
     return jsonify({'pid': pid}), 201
